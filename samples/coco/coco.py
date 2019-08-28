@@ -61,7 +61,11 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
-DEFAULT_DATASET_YEAR = "2014"
+DEFAULT_DATASET_YEAR = "2019"
+
+STAGE_ONE_EPOCHS = 40
+STAGE_TWO_EPOCHS = 80
+STAGE_THREE_EPOCHS = 40
 
 ############################################################
 #  Configurations
@@ -74,7 +78,7 @@ class CocoConfig(Config):
     to the COCO dataset.
     """
     # Give the configuration a recognizable name
-    NAME = "shape"
+    NAME = "ROCOFootprints_256_spacenet_stage 2"
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
@@ -85,9 +89,9 @@ class CocoConfig(Config):
 
     STEPS_PER_EPOCH = 1000
 
-    # VALIDATION_STEPS = 50
+    VALIDATION_STEPS = 75#50
 
-    # LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.001
 
     # LEARNING_MOMENTUM = 0.9
 
@@ -97,14 +101,13 @@ class CocoConfig(Config):
     IMAGE_MIN_DIM = 256
     IMAGE_MAX_DIM = 256
 
-
 ############################################################
 #  Dataset
 ############################################################
 
 class CocoDataset(utils.Dataset):
     def load_coco(self, dataset_dir, subset, year=DEFAULT_DATASET_YEAR, class_ids=None,
-                  class_map=None, return_coco=False, auto_download=False):
+                  class_map=None, return_coco=False, subset_number = 1):
         """Load a subset of the COCO dataset.
         dataset_dir: The root directory of the COCO dataset.
         subset: What to load (train, val, minival, valminusminival)
@@ -116,13 +119,10 @@ class CocoDataset(utils.Dataset):
         auto_download: Automatically download and unzip MS-COCO images and annotations
         """
 
-        if auto_download is True:
-            self.auto_download(dataset_dir, subset, year)
-
-        coco = COCO("{}/instances_{}.json".format(dataset_dir, subset))
-        if subset == "minival" or subset == "valminusminival":
-            subset = "val"
-        image_dir = "{}/{}{}/images".format(dataset_dir, subset, year)
+        coco = COCO("{}/instances_{}_stage{}.json".format(dataset_dir, subset, subset_number))
+        # if subset == "minival" or subset == "valminusminival":
+        #     subset = "val"
+        image_dir = "{}/{}_stage{}/images".format(dataset_dir, subset, subset_number)
 
         # Load all classes or a subset?
         if not class_ids:
@@ -155,78 +155,6 @@ class CocoDataset(utils.Dataset):
                     imgIds=[i], catIds=class_ids, iscrowd=None)))
         if return_coco:
             return coco
-
-    def auto_download(self, dataDir, dataType, dataYear):
-        """Download the COCO dataset/annotations if requested.
-        dataDir: The root directory of the COCO dataset.
-        dataType: What to load (train, val, minival, valminusminival)
-        dataYear: What dataset year to load (2014, 2017) as a string, not an integer
-        Note:
-            For 2014, use "train", "val", "minival", or "valminusminival"
-            For 2017, only "train" and "val" annotations are available
-        """
-
-        # Setup paths and file names
-        if dataType == "minival" or dataType == "valminusminival":
-            imgDir = "{}/{}{}".format(dataDir, "val", dataYear)
-            imgZipFile = "{}/{}{}.zip".format(dataDir, "val", dataYear)
-            imgURL = "http://images.cocodataset.org/zips/{}{}.zip".format("val", dataYear)
-        else:
-            imgDir = "{}/{}{}".format(dataDir, dataType, dataYear)
-            imgZipFile = "{}/{}{}.zip".format(dataDir, dataType, dataYear)
-            imgURL = "http://images.cocodataset.org/zips/{}{}.zip".format(dataType, dataYear)
-        # print("Image paths:"); print(imgDir); print(imgZipFile); print(imgURL)
-
-        # Create main folder if it doesn't exist yet
-        if not os.path.exists(dataDir):
-            os.makedirs(dataDir)
-
-        # Download images if not available locally
-        if not os.path.exists(imgDir):
-            os.makedirs(imgDir)
-            print("Downloading images to " + imgZipFile + " ...")
-            with urllib.request.urlopen(imgURL) as resp, open(imgZipFile, 'wb') as out:
-                shutil.copyfileobj(resp, out)
-            print("... done downloading.")
-            print("Unzipping " + imgZipFile)
-            with zipfile.ZipFile(imgZipFile, "r") as zip_ref:
-                zip_ref.extractall(dataDir)
-            print("... done unzipping")
-        print("Will use images in " + imgDir)
-
-        # Setup annotations data paths
-        annDir = "{}/annotations".format(dataDir)
-        if dataType == "minival":
-            annZipFile = "{}/instances_minival2014.json.zip".format(dataDir)
-            annFile = "{}/instances_minival2014.json".format(annDir)
-            annURL = "https://dl.dropboxusercontent.com/s/o43o90bna78omob/instances_minival2014.json.zip?dl=0"
-            unZipDir = annDir
-        elif dataType == "valminusminival":
-            annZipFile = "{}/instances_valminusminival2014.json.zip".format(dataDir)
-            annFile = "{}/instances_valminusminival2014.json".format(annDir)
-            annURL = "https://dl.dropboxusercontent.com/s/s3tw5zcg7395368/instances_valminusminival2014.json.zip?dl=0"
-            unZipDir = annDir
-        else:
-            annZipFile = "{}/annotations_trainval{}.zip".format(dataDir, dataYear)
-            annFile = "{}/instances_{}{}.json".format(annDir, dataType, dataYear)
-            annURL = "http://images.cocodataset.org/annotations/annotations_trainval{}.zip".format(dataYear)
-            unZipDir = dataDir
-        # print("Annotations paths:"); print(annDir); print(annFile); print(annZipFile); print(annURL)
-
-        # Download annotations if not available locally
-        if not os.path.exists(annDir):
-            os.makedirs(annDir)
-        if not os.path.exists(annFile):
-            if not os.path.exists(annZipFile):
-                print("Downloading zipped annotations to " + annZipFile + " ...")
-                with urllib.request.urlopen(annURL) as resp, open(annZipFile, 'wb') as out:
-                    shutil.copyfileobj(resp, out)
-                print("... done downloading.")
-            print("Unzipping " + annZipFile)
-            with zipfile.ZipFile(annZipFile, "r") as zip_ref:
-                zip_ref.extractall(unZipDir)
-            print("... done unzipping")
-        print("Will use annotations in " + annFile)
 
     def load_mask(self, image_id):
         """Load instance masks for the given image.
@@ -439,13 +367,18 @@ if __name__ == '__main__':
                         metavar="<True|False>",
                         help='Automatically download and unzip MS-COCO files (default=False)',
                         type=bool)
+    parser.add_argument('--subset', required=False,
+                        default=1,
+                        metavar="<number of the subset to use>",
+                        help='The number of the subset to train on (default=1)')
     args = parser.parse_args()
     print("Command: ", args.command)
     print("Model: ", args.model)
     print("Dataset: ", args.dataset)
     print("Year: ", args.year)
-    print("Logs: ", args.logs)
+    print("Logs: ", args.logs)  
     print("Auto Download: ", args.download)
+    print("Subset: ", args.subset)
 
     # Configurations
     if args.command == "train":
@@ -477,27 +410,34 @@ if __name__ == '__main__':
     elif args.model.lower() == "imagenet":
         # Start from ImageNet trained weights
         model_path = model.get_imagenet_weights()
+    elif args.model.lower() == "spacenet":
+        model_path = os.path.join(ROOT_DIR, "mask_rcnn_spacenet_0053.h5")
     else:
-        model_path = args.model
+        model_path = os.path.join(ROOT_DIR, args.model)
 
     # Load weights
     print("Loading weights ", model_path)
-    model.load_weights(model_path, by_name=True, exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"])
+    model.load_weights(model_path, by_name=True)#, exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"])
 
     # Train or evaluate
     if args.command == "train":
+        offset_epochs = 5
+        num_epochs = (STAGE_ONE_EPOCHS + STAGE_TWO_EPOCHS + STAGE_THREE_EPOCHS) * offset_epochs #0
         # Training dataset. Use the training set and 35K from the
         # validation set, as as in the Mask RCNN paper.
+        # for i in range(5):
+        subset_number = args.subset
+        print("Starting training on subset: {}".format(subset_number))
         dataset_train = CocoDataset()
-        dataset_train.load_coco(args.dataset, "train", year=args.year, auto_download=args.download)
-        if args.year in '2014':
-            dataset_train.load_coco(args.dataset, "valminusminival", year=args.year, auto_download=args.download)
+        dataset_train.load_coco(args.dataset, "train", year=args.year, subset_number=subset_number)
+        # if args.year in '2014':
+        #     dataset_train.load_coco(args.dataset, "valminusminival", year=args.year, subset_number=args.subset)
         dataset_train.prepare()
 
         # Validation dataset
         dataset_val = CocoDataset()
-        val_type = "val" if args.year in '2017' else "minival"
-        dataset_val.load_coco(args.dataset, val_type, year=args.year, auto_download=args.download)
+        val_type = "val" #if args.year in '2017' else "minival"
+        dataset_val.load_coco(args.dataset, val_type, year=args.year, subset_number=subset_number)
         dataset_val.prepare()
 
         # Image Augmentation
@@ -505,38 +445,43 @@ if __name__ == '__main__':
         augmentation = imgaug.augmenters.Fliplr(0.5)
 
         # *** This training schedule is an example. Update to your needs ***
+        num_epochs += STAGE_ONE_EPOCHS
 
         # Training - Stage 1
-        print("Training network heads")
+        print("Training network heads: subset {}".format(subset_number))
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE,
-                    epochs=40,
+                    epochs=num_epochs,#200,#40,
                     layers='heads',
                     augmentation=augmentation)
 
+        num_epochs += STAGE_TWO_EPOCHS
+
         # Training - Stage 2
         # Finetune layers from ResNet stage 4 and up
-        print("Fine tune Resnet stage 4 and up")
+        print("Fine tune Resnet stage 4 and up: subset {}".format(subset_number))
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE,
-                    epochs=120,
+                    epochs=num_epochs,#280,#120,
                     layers='4+',
                     augmentation=augmentation)
 
+        num_epochs += STAGE_THREE_EPOCHS
+
         # Training - Stage 3
         # Fine tune all layers
-        print("Fine tune all layers")
+        print("Fine tune all layers: subset {}".format(subset_number))
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE / 10,
-                    epochs=160,
+                    epochs=num_epochs,#320,#160,
                     layers='all',
                     augmentation=augmentation)
 
     elif args.command == "evaluate":
         # Validation dataset
         dataset_val = CocoDataset()
-        val_type = "val" if args.year in '2017' else "minival"
-        coco = dataset_val.load_coco(args.dataset, val_type, year=args.year, return_coco=True, auto_download=args.download)
+        val_type = "val"#val" if args.year in '2017' else "minival"
+        coco = dataset_val.load_coco(args.dataset, val_type, year=args.year, return_coco=True, subset_number=args.subset)
         dataset_val.prepare()
         print("Running COCO evaluation on {} images.".format(args.limit))
         evaluate_coco(model, dataset_val, coco, "bbox", limit=int(args.limit))
