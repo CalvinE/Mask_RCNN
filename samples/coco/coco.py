@@ -63,9 +63,9 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_DATASET_YEAR = "2019"
 
-STAGE_ONE_EPOCHS = 40
-STAGE_TWO_EPOCHS = 80
-STAGE_THREE_EPOCHS = 40
+STAGE_ONE_EPOCHS = 80#40
+STAGE_TWO_EPOCHS = 160#80
+STAGE_THREE_EPOCHS = 80#40
 
 ############################################################
 #  Configurations
@@ -78,7 +78,7 @@ class CocoConfig(Config):
     to the COCO dataset.
     """
     # Give the configuration a recognizable name
-    NAME = "ROCOFootprints_256_spacenet_stage 2"
+    NAME = "ROCOFootprints_9_Inch_Only_Features_256_Whole_2019_Subset_1"
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
@@ -87,7 +87,7 @@ class CocoConfig(Config):
     # Uncomment to train on 8 GPUs (default is 1)
     GPU_COUNT = 1
 
-    STEPS_PER_EPOCH = 1000
+    STEPS_PER_EPOCH = 5000#1000
 
     VALIDATION_STEPS = 75#50
 
@@ -421,8 +421,8 @@ if __name__ == '__main__':
 
     # Train or evaluate
     if args.command == "train":
-        offset_epochs = 5
-        num_epochs = (STAGE_ONE_EPOCHS + STAGE_TWO_EPOCHS + STAGE_THREE_EPOCHS) * offset_epochs #0
+        # offset_epochs = 5
+        num_epochs = 0#(STAGE_ONE_EPOCHS + STAGE_TWO_EPOCHS + STAGE_THREE_EPOCHS) * offset_epochs #0
         # Training dataset. Use the training set and 35K from the
         # validation set, as as in the Mask RCNN paper.
         # for i in range(5):
